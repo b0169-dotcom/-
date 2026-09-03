@@ -31,7 +31,8 @@
     
     .search-section { margin-top: 30px; padding-top: 15px; border-top: 2px dashed #bdc3c7; }
     .search-title { color: #8e44ad; border-bottom: 2px solid #9b59b6; padding-bottom: 6px; margin-bottom: 12px; font-size: 18px; font-weight: bold;}
-    .btn-search { background-color: #8e44ad; margin-top: 8px; }
+    .btn-search { background-color: #8e44ad; margin-top: 6px; }
+    .btn-date-search { background-color: #e67e22; margin-top: 8px; }
     .result-card { background: #fff; border-left: 4px solid #8e44ad; padding: 10px; margin-bottom: 8px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 13px;}
     
     /* 🛒 標籤暫存區樣式 */
@@ -112,15 +113,23 @@
   <div class="search-section">
     <div class="search-title">🔍 快速查詢與列印標籤</div>
     
+    <!-- 1. 關鍵字搜尋 -->
     <div class="form-group">
-      <label>搜尋關鍵字 或 📅 點選日曆選擇日期</label>
-      <div style="display: flex; gap: 6px;">
-        <input type="text" id="searchKeyword" placeholder="如: 夏, D3-3..." onkeypress="if(event.key==='Enter') searchData()">
-        <input type="date" id="datePicker" onchange="searchByDatePicker()" style="width: 140px; cursor: pointer;">
-      </div>
+      <label>🔍 關鍵字搜尋 (箱號/位置/分類)</label>
+      <input type="text" id="searchKeyword" placeholder="如: 夏, D3-3..." onkeypress="if(event.key==='Enter') searchData()">
+      <button type="button" class="btn btn-search" onclick="searchData()">搜尋關鍵字</button>
     </div>
-    
-    <button type="button" class="btn btn-search" onclick="searchData()">搜尋庫存</button>
+
+    <!-- 2. 日期區間搜尋 -->
+    <div class="form-group" style="margin-top: 15px; background: #fcf8e3; padding: 10px; border-radius: 6px; border: 1px solid #faebcc;">
+      <label style="color: #8a6d3b;">📅 依建檔/更新日期區間搜尋</label>
+      <div style="display: flex; gap: 6px; align-items: center; margin-top: 4px;">
+        <input type="date" id="startDate" style="cursor: pointer;">
+        <span style="font-weight: bold; color: #8a6d3b;">至</span>
+        <input type="date" id="endDate" style="cursor: pointer;">
+      </div>
+      <button type="button" class="btn btn-date-search" onclick="searchByDateRange()">📅 搜尋日期區間</button>
+    </div>
 
     <div id="searchResults" style="margin-top: 15px;"></div>
 
@@ -278,19 +287,11 @@
       checkboxes.forEach(cb => cb.checked = isCheck);
     }
 
-    function searchByDatePicker() {
-      var dateVal = document.getElementById('datePicker').value;
-      if (!dateVal) return;
-      var formattedDate = dateVal.replace(/-/g, '/');
-      document.getElementById('searchKeyword').value = formattedDate;
-      searchData();
-    }
-
-    // 🔍 搜尋庫存
+    // 🔍 1. 關鍵字搜尋
     function searchData() {
       var kw = document.getElementById('searchKeyword').value.trim();
       var resDiv = document.getElementById('searchResults');
-      if (!kw) { alert("請輸入關鍵字或選擇日期！"); return; }
+      if (!kw) { alert("請輸入關鍵字！"); return; }
       
       resDiv.innerHTML = "⏳ 搜尋中...";
       
@@ -298,36 +299,7 @@
         .then(res => res.json())
         .then(res => {
           if (res.success && res.data.length > 0) {
-            globalSearchResults = res.data;
-            
-            var html = `
-              <div style="margin-bottom:8px; font-size:13px; color:#555; display:flex; justify-content:space-between; align-items:center;">
-                <div>✅ 找到 ${res.data.length} 箱資料</div>
-                <div>
-                  <button type="button" onclick="selectAllCheckboxes(true)" style="padding:2px 6px; font-size:12px;">全選</button>
-                  <button type="button" onclick="selectAllCheckboxes(false)" style="padding:2px 6px; font-size:12px;">全不選</button>
-                </div>
-              </div>
-            `;
-            
-            res.data.forEach((item, index) => {
-              html += `
-                <div class="result-card" style="display: flex; align-items: center; gap: 10px;">
-                  <input type="checkbox" class="search-cb" value="${index}" style="width: 20px; height: 20px;" checked>
-                  <div style="flex-grow: 1;">
-                    <div style="font-weight:bold; margin-bottom:2px;">📦 ${item.boxId}</div>
-                    📍 <b>位置：</b>${item.location} | 💰 <b>單價：</b>$${item.price} | 🏷️ <b>分類：</b>${item.season}${item.category}
-                  </div>
-                </div>
-              `;
-            });
-
-            html += `
-              <button type="button" class="btn-print-direct" onclick="printDirectlyAllSearchResults()">🖨️ 一鍵列印「本次搜尋」全部標籤 (${res.data.length} 個)</button>
-              <button type="button" class="btn-print-selected" onclick="printDirectlySelectedResults()">🖨️ 一鍵列印「已勾選」標籤</button>
-              <button type="button" class="btn-add-queue" onclick="addSelectedToQueue()">🛒 將勾選項目加入下方待印清單</button>
-            `;
-            resDiv.innerHTML = html;
+            renderSearchResults(res.data);
           } else {
             globalSearchResults = [];
             resDiv.innerHTML = `<div style="color:#e74c3c; font-weight:bold;">⚠️ 找不到與「${kw}」相關的箱號或紀錄。</div>`;
@@ -336,6 +308,102 @@
         .catch(err => {
           resDiv.innerHTML = "❌ 搜尋失敗，請確認網路連線。";
         });
+    }
+
+    // 📅 2. 日期區間搜尋
+    function searchByDateRange() {
+      var start = document.getElementById('startDate').value;
+      var end = document.getElementById('endDate').value;
+
+      if (!start || !end) {
+        alert("⚠️ 請完整選擇「起始日期」與「結束日期」！");
+        return;
+      }
+      if (start > end) {
+        alert("⚠️ 起始日期不能大於結束日期！");
+        return;
+      }
+
+      var resDiv = document.getElementById('searchResults');
+      resDiv.innerHTML = "⏳ 正在搜尋日期區間資料...";
+
+      fetch(`${GAS_API_URL}?action=search&keyword=`)
+        .then(res => res.json())
+        .then(res => {
+          if (res.success && res.data && res.data.length > 0) {
+            // 進行日期區間過濾
+            var filtered = res.data.filter(item => {
+              var itemDateStr = item.date || item.timestamp || item.createdDate || item.boxId;
+              if (!itemDateStr) return false;
+              
+              var formattedItemDate = parseToDateString(itemDateStr);
+              if (!formattedItemDate) return false;
+
+              return formattedItemDate >= start && formattedItemDate <= end;
+            });
+
+            if (filtered.length > 0) {
+              renderSearchResults(filtered);
+            } else {
+              globalSearchResults = [];
+              resDiv.innerHTML = `<div style="color:#e74c3c; font-weight:bold;">⚠️ 在 ${start} 至 ${end} 區間內找不到符合的庫存資料。</div>`;
+            }
+          } else {
+            globalSearchResults = [];
+            resDiv.innerHTML = `<div style="color:#e74c3c; font-weight:bold;">⚠️ 目前資料庫中沒有任何庫存資料。</div>`;
+          }
+        })
+        .catch(err => {
+          resDiv.innerHTML = "❌ 搜尋失敗，請確認網路連線。";
+        });
+    }
+
+    // 輔助函式：將各式日期格式轉換為 YYYY-MM-DD 比對
+    function parseToDateString(str) {
+      if (!str) return null;
+      var match = String(str).match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+      if (match) {
+        var y = match[1];
+        var m = match[2].padStart(2, '0');
+        var d = match[3].padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+      return null;
+    }
+
+    // 渲染搜尋結果列表
+    function renderSearchResults(dataList) {
+      globalSearchResults = dataList;
+      var resDiv = document.getElementById('searchResults');
+      
+      var html = `
+        <div style="margin-bottom:8px; font-size:13px; color:#555; display:flex; justify-content:space-between; align-items:center;">
+          <div>✅ 找到 ${dataList.length} 箱資料</div>
+          <div>
+            <button type="button" onclick="selectAllCheckboxes(true)" style="padding:2px 6px; font-size:12px;">全選</button>
+            <button type="button" onclick="selectAllCheckboxes(false)" style="padding:2px 6px; font-size:12px;">全不選</button>
+          </div>
+        </div>
+      `;
+      
+      dataList.forEach((item, index) => {
+        html += `
+          <div class="result-card" style="display: flex; align-items: center; gap: 10px;">
+            <input type="checkbox" class="search-cb" value="${index}" style="width: 20px; height: 20px;" checked>
+            <div style="flex-grow: 1;">
+              <div style="font-weight:bold; margin-bottom:2px;">📦 ${item.boxId}</div>
+              📍 <b>位置：</b>${item.location} | 💰 <b>單價：</b>$${item.price} | 🏷️ <b>分類：</b>${item.season}${item.category}
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
+        <button type="button" class="btn-print-direct" onclick="printDirectlyAllSearchResults()">🖨️ 一鍵列印「本次搜尋」全部標籤 (${dataList.length} 個)</button>
+        <button type="button" class="btn-print-selected" onclick="printDirectlySelectedResults()">🖨️ 一鍵列印「已勾選」標籤</button>
+        <button type="button" class="btn-add-queue" onclick="addSelectedToQueue()">🛒 將勾選項目加入下方待印清單</button>
+      `;
+      resDiv.innerHTML = html;
     }
 
     // 🌐 網頁最下方：不搜尋直接抓全庫存並列印
