@@ -153,11 +153,12 @@
   </div>
 
   <script>
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxVmccNkeLxB_7GSjGVSVZr1N5zrQCwtw7K2MDlg-20bJlzenZnSp9uPpHeu7qnVhqXHg/exec";
+    // 已更新為最新的 GAS Web App URL
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwOg6GzQYFasXuJIFOVMuO9D1m5yc7ih5G4f3qVdA8r1KbP5qiB49P8uWSJazBdlc7o8A/exec";
     
     var html5QrcodeScanner = null;
-    var globalSearchResults = []; // 當前搜尋結果
-    var printQueue = [];           // 🛒 跨次待列印暫存區
+    var globalSearchResults = [];
+    var printQueue = [];
 
     function startScanner() {
       document.getElementById('reader-wrapper').style.display = 'block';
@@ -287,7 +288,6 @@
       checkboxes.forEach(cb => cb.checked = isCheck);
     }
 
-    // 🔍 1. 關鍵字搜尋
     function searchData() {
       var kw = document.getElementById('searchKeyword').value.trim();
       var resDiv = document.getElementById('searchResults');
@@ -310,7 +310,6 @@
         });
     }
 
-    // 📅 2. 日期區間搜尋
     function searchByDateRange() {
       var start = document.getElementById('startDate').value;
       var end = document.getElementById('endDate').value;
@@ -331,14 +330,11 @@
         .then(res => res.json())
         .then(res => {
           if (res.success && res.data && res.data.length > 0) {
-            // 進行日期區間過濾
             var filtered = res.data.filter(item => {
-              var itemDateStr = item.date || item.timestamp || item.createdDate || item.boxId;
+              var itemDateStr = item.date || item.boxId;
               if (!itemDateStr) return false;
-              
               var formattedItemDate = parseToDateString(itemDateStr);
               if (!formattedItemDate) return false;
-
               return formattedItemDate >= start && formattedItemDate <= end;
             });
 
@@ -358,7 +354,6 @@
         });
     }
 
-    // 輔助函式：將各式日期格式轉換為 YYYY-MM-DD 比對
     function parseToDateString(str) {
       if (!str) return null;
       var match = String(str).match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
@@ -371,7 +366,6 @@
       return null;
     }
 
-    // 渲染搜尋結果列表
     function renderSearchResults(dataList) {
       globalSearchResults = dataList;
       var resDiv = document.getElementById('searchResults');
@@ -406,7 +400,6 @@
       resDiv.innerHTML = html;
     }
 
-    // 🌐 網頁最下方：不搜尋直接抓全庫存並列印
     function printAllInventoryLabels(evt) {
       var btn = evt.target;
       var originalText = btn.innerText;
@@ -515,7 +508,6 @@
       renderAndPrint(printQueue);
     }
 
-    // 🖨️ 通用標籤渲染與列印功能
     function renderAndPrint(itemsList) {
       var printWin = window.open('', '_blank');
       if (!printWin) {
