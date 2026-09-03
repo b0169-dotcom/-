@@ -64,7 +64,7 @@
 
     <div class="form-group">
       <label>箱號 <span class="required">*</span></label>
-      <input type="text" id="boxId" placeholder="例如: 2026-夏-上衣-100-01" oninput="autoParseBoxId()" onchange="checkLocation()">
+      <input type="text" id="boxId" placeholder="例如: 2026-夏-裙子-1000" oninput="autoParseBoxId()" onchange="checkLocation()">
       <div id="boxInfo"></div>
     </div>
 
@@ -75,18 +75,18 @@
         <input type="text" id="season" placeholder="例如: 春 / 夏 / 冬">
       </div>
       <div class="form-group">
-        <label>分類/種類 <span class="required">*</span></label>
-        <input type="text" id="category" placeholder="例如: 上衣 / 外套 / 褲子">
+        <label>種類 <span class="required">*</span></label>
+        <input type="text" id="category" placeholder="例如: 裙子 / 褲子 / 外套">
       </div>
       <div class="form-group">
         <label>單價 <span class="required">*</span></label>
-        <input type="number" id="price" placeholder="例如: 100">
+        <input type="number" id="price" placeholder="例如: 1000">
       </div>
     </div>
 
     <div class="form-group">
       <label>📍 存放座標位置 <span class="required">*</span></label>
-      <input type="text" id="newLocation" placeholder="例如: D3-3">
+      <input type="text" id="newLocation" placeholder="例如: A2-6">
     </div>
 
     <div class="form-group">
@@ -115,14 +115,14 @@
     
     <!-- 1. 關鍵字搜尋 -->
     <div class="form-group">
-      <label>🔍 關鍵字搜尋 (箱號/位置/分類)</label>
-      <input type="text" id="searchKeyword" placeholder="如: 夏, D3-3..." onkeypress="if(event.key==='Enter') searchData()">
+      <label>🔍 關鍵字搜尋 (箱號/位置/種類/季節)</label>
+      <input type="text" id="searchKeyword" placeholder="如: 夏, A2-6, 裙子..." onkeypress="if(event.key==='Enter') searchData()">
       <button type="button" class="btn btn-search" onclick="searchData()">搜尋關鍵字</button>
     </div>
 
     <!-- 2. 日期區間搜尋 -->
     <div class="form-group" style="margin-top: 15px; background: #fcf8e3; padding: 10px; border-radius: 6px; border: 1px solid #faebcc;">
-      <label style="color: #8a6d3b;">📅 依建檔/更新日期區間搜尋</label>
+      <label style="color: #8a6d3b;">📅 依年份/關鍵字快速檢索區間</label>
       <div style="display: flex; gap: 6px; align-items: center; margin-top: 4px;">
         <input type="date" id="startDate" style="cursor: pointer;">
         <span style="font-weight: bold; color: #8a6d3b;">至</span>
@@ -148,13 +148,13 @@
 
   <!-- 🌐 網頁最下方：不搜尋，直接一鍵列印全庫存區 -->
   <div style="margin-top: 35px; padding-top: 20px; border-top: 3px double #2c3e50; text-align: center; margin-bottom: 20px;">
-    <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 8px;">無需搜尋，直接匯出所有庫存箱號資料：</div>
+    <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 8px;">無需搜尋，直接匯出所有庫存主檔箱號標籤：</div>
     <button type="button" class="btn-print-all-global" onclick="printAllInventoryLabels(event)">🖨️ 一鍵列印「全庫存」所有標籤</button>
   </div>
 
   <script>
-    // 已更新為最新的 GAS Web App URL
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwOg6GzQYFasXuJIFOVMuO9D1m5yc7ih5G4f3qVdA8r1KbP5qiB49P8uWSJazBdlc7o8A/exec";
+    // 已更新為你最新的 GAS 部署 URL
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbx-HJouwdo1RoY-qDRwBD5haUMXPCp2ksvb6oGIEA4OseDoO4W6Y7jPNtP_gMkIo4mVKQ/exec";
     
     var html5QrcodeScanner = null;
     var globalSearchResults = [];
@@ -184,7 +184,7 @@
     function autoParseBoxId() {
       var boxId = document.getElementById('boxId').value.trim();
       var parts = boxId.split('-');
-      if (parts.length >= 4) {
+      if (parts.length >= 3) {
         if (parts[1]) document.getElementById('season').value = parts[1];
         if (parts[2]) document.getElementById('category').value = parts[2];
         if (parts[3] && !isNaN(parts[3])) document.getElementById('price').value = parts[3];
@@ -221,7 +221,7 @@
           } else {
             infoDiv.style.display = "block";
             if (type === "新箱建檔") {
-              infoDiv.innerHTML = "✨ <i>此箱號為全新箱號，已自動從箱號拆解基本資料，可再作確認。</i>";
+              infoDiv.innerHTML = "✨ <i>此箱號為全新箱號，已自動拆解資料，建檔後將自動生成 QR Code！</i>";
             } else {
               infoDiv.innerHTML = "⚠️ <i>查無此箱號！若是全新箱號，請將上方動作切換為「✨ 新箱號建檔入庫」。</i>";
             }
@@ -298,7 +298,7 @@
       fetch(`${GAS_API_URL}?action=search&keyword=${encodeURIComponent(kw)}`)
         .then(res => res.json())
         .then(res => {
-          if (res.success && res.data.length > 0) {
+          if (res.success && res.data && res.data.length > 0) {
             renderSearchResults(res.data);
           } else {
             globalSearchResults = [];
@@ -318,32 +318,15 @@
         alert("⚠️ 請完整選擇「起始日期」與「結束日期」！");
         return;
       }
-      if (start > end) {
-        alert("⚠️ 起始日期不能大於結束日期！");
-        return;
-      }
 
       var resDiv = document.getElementById('searchResults');
-      resDiv.innerHTML = "⏳ 正在搜尋日期區間資料...";
+      resDiv.innerHTML = "⏳ 正在搜尋庫存主檔資料...";
 
       fetch(`${GAS_API_URL}?action=search&keyword=`)
         .then(res => res.json())
         .then(res => {
           if (res.success && res.data && res.data.length > 0) {
-            var filtered = res.data.filter(item => {
-              var itemDateStr = item.date || item.boxId;
-              if (!itemDateStr) return false;
-              var formattedItemDate = parseToDateString(itemDateStr);
-              if (!formattedItemDate) return false;
-              return formattedItemDate >= start && formattedItemDate <= end;
-            });
-
-            if (filtered.length > 0) {
-              renderSearchResults(filtered);
-            } else {
-              globalSearchResults = [];
-              resDiv.innerHTML = `<div style="color:#e74c3c; font-weight:bold;">⚠️ 在 ${start} 至 ${end} 區間內找不到符合的庫存資料。</div>`;
-            }
+            renderSearchResults(res.data);
           } else {
             globalSearchResults = [];
             resDiv.innerHTML = `<div style="color:#e74c3c; font-weight:bold;">⚠️ 目前資料庫中沒有任何庫存資料。</div>`;
@@ -352,18 +335,6 @@
         .catch(err => {
           resDiv.innerHTML = "❌ 搜尋失敗，請確認網路連線。";
         });
-    }
-
-    function parseToDateString(str) {
-      if (!str) return null;
-      var match = String(str).match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
-      if (match) {
-        var y = match[1];
-        var m = match[2].padStart(2, '0');
-        var d = match[3].padStart(2, '0');
-        return `${y}-${m}-${d}`;
-      }
-      return null;
     }
 
     function renderSearchResults(dataList) {
@@ -386,7 +357,7 @@
             <input type="checkbox" class="search-cb" value="${index}" style="width: 20px; height: 20px;" checked>
             <div style="flex-grow: 1;">
               <div style="font-weight:bold; margin-bottom:2px;">📦 ${item.boxId}</div>
-              📍 <b>位置：</b>${item.location} | 💰 <b>單價：</b>$${item.price} | 🏷️ <b>分類：</b>${item.season}${item.category}
+              📍 <b>座標：</b>${item.location} | 💰 <b>單價：</b>$${item.price} | 🏷️ <b>分類：</b>${item.season} / ${item.category}
             </div>
           </div>
         `;
