@@ -14,10 +14,11 @@
     select, input[type="text"], input[type="number"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
     .btn { background-color: #27ae60; color: white; padding: 12px; border: none; width: 100%; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
     .btn-scan { background-color: #2980b9; margin-bottom: 12px; }
-    .btn-add-queue { background-color: #e67e22; margin-top: 8px; width: 100%; }
-    .btn-print-direct { background-color: #d35400; margin-top: 8px; width: 100%; }
-    .btn-print-queue { background-color: #27ae60; margin-top: 10px; width: 100%; }
+    .btn-add-all { background-color: #e67e22; border: none; color: white; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; }
+    .btn-add-selected { background-color: #f39c12; border: none; color: white; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; }
+    .btn-print-queue { background-color: #27ae60; margin-top: 10px; width: 100%; font-size: 16px; }
     .btn-clear { background-color: #95a5a6; font-size: 12px; padding: 4px 8px; border: none; color: white; border-radius: 4px; cursor: pointer; }
+    .btn-today { background: #34495e; color: white; border: none; border-radius: 6px; padding: 0 12px; font-weight: bold; cursor: pointer; white-space: nowrap; }
     #status { margin-top: 15px; font-size: 14px; font-weight: bold; text-align: center; }
     #boxInfo { margin-top: 6px; padding: 10px; background: #eef7fc; border-left: 4px solid #3498db; font-size: 13px; display: none; }
     #newBoxSection { background-color: #e8f8f5; padding: 12px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #2ecc71; }
@@ -105,25 +106,28 @@
 
   <!-- 👇 搜尋與標籤列印區 👇 -->
   <div class="search-section">
-    <div class="search-title">🔍 快速查詢與列印標籤</div>
+    <div class="search-title">🔍 快速查詢與收集標籤</div>
     <div class="form-group">
-      <label>輸入想找的分類、座標或箱號</label>
-      <input type="text" id="searchKeyword" placeholder="例如: 夏, 上衣, D3-3..." onkeypress="if(event.key==='Enter') searchData()">
+      <label>關鍵字 / 日期時間軸查詢</label>
+      <div style="display: flex; gap: 6px;">
+        <input type="text" id="searchKeyword" placeholder="如: 夏, D3-3 或日期..." onkeypress="if(event.key==='Enter') searchData()">
+        <button type="button" class="btn-today" onclick="searchToday()">📅 今天</button>
+      </div>
     </div>
     <button type="button" class="btn btn-search" onclick="searchData()">搜尋庫存</button>
 
     <div id="searchResults" style="margin-top: 15px;"></div>
 
-    <!-- 🛒 跨次搜尋待列印標籤暫存區 -->
+    <!-- 🛒 待列印標籤暫存區 -->
     <div class="queue-section">
       <div class="queue-title">
-        <span>🛒 跨次搜尋待印清單 (<span id="queueCount">0</span>)</span>
+        <span>🛒 待列印標籤清單 (<span id="queueCount">0</span>)</span>
         <button type="button" class="btn-clear" onclick="clearQueue()">清空暫存區</button>
       </div>
       <div id="queueList">
         <div style="color: #7f8c8d; font-size: 13px; text-align: center; padding: 10px;">尚未加入任何標籤</div>
       </div>
-      <button type="button" class="btn btn-print-queue" onclick="printQueueItems()">🖨️ 一鍵列印「待印清單」所有標籤</button>
+      <button type="button" class="btn btn-print-queue" onclick="printQueueItems()">🖨️ 一鍵列印「待列印清單」所有標籤</button>
     </div>
   </div>
 
@@ -132,7 +136,7 @@
     
     var html5QrcodeScanner = null;
     var globalSearchResults = []; // 當前搜尋結果
-    var printQueue = [];           // 🛒 跨次待列印暫存區
+    var printQueue = [];           // 🛒 待列印暫存區
 
     function startScanner() {
       document.getElementById('reader-wrapper').style.display = 'block';
@@ -262,11 +266,24 @@
       checkboxes.forEach(cb => cb.checked = isCheck);
     }
 
+    // 📅 快捷鍵：一鍵填入今天日期並搜尋
+    function searchToday() {
+      var today = new Date();
+      var yyyy = today.getFullYear();
+      var mm = String(today.getMonth() + 1).padStart(2, '0');
+      var dd = String(today.getDate()).padStart(2, '0');
+      
+      // 自動搜尋今天 (如: 2026/09/03 或 2026-09-03)
+      var dateStr = `${yyyy}/${mm}/${dd}`;
+      document.getElementById('searchKeyword').value = dateStr;
+      searchData();
+    }
+
     // 🔍 搜尋庫存
     function searchData() {
       var kw = document.getElementById('searchKeyword').value.trim();
       var resDiv = document.getElementById('searchResults');
-      if (!kw) { alert("請輸入關鍵字！"); return; }
+      if (!kw) { alert("請輸入關鍵字或點擊「今天」！"); return; }
       
       resDiv.innerHTML = "⏳ 搜尋中...";
       
@@ -298,15 +315,17 @@
               `;
             });
 
-            // ⚡ 雙按鈕功能：一鍵全印 vs 勾選加入清單
+            // ⚡ 雙加入按鈕：一鍵把本次全部加入 vs 只加入勾選
             html += `
-              <button type="button" class="btn btn-print-direct" onclick="printDirectlyAllSearchResults()">🖨️ 一鍵列印「本次搜尋」全部標籤 (${res.data.length} 個)</button>
-              <button type="button" class="btn btn-add-queue" onclick="addSelectedToQueue()">➕ 將勾選項目加入待印清單</button>
+              <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <button type="button" class="btn-add-all" onclick="addAllSearchResultsToQueue()" style="flex: 1;">📥 一鍵將本次搜尋全部加入待印</button>
+                <button type="button" class="btn-add-selected" onclick="addSelectedToQueue()" style="flex: 1;">➕ 僅加入勾選項目</button>
+              </div>
             `;
             resDiv.innerHTML = html;
           } else {
             globalSearchResults = [];
-            resDiv.innerHTML = `<div style="color:#e74c3c; font-weight:bold;">⚠️ 找不到與「${kw}」相關的箱號。</div>`;
+            resDiv.innerHTML = `<div style="color:#e74c3c; font-weight:bold;">⚠️ 找不到與「${kw}」相關的箱號或紀錄。</div>`;
           }
         })
         .catch(err => {
@@ -314,16 +333,27 @@
         });
     }
 
-    // ⚡ 1. 一鍵直接列印「本次搜尋」的所有標籤
-    function printDirectlyAllSearchResults() {
+    // 📥 1. 一鍵將「本次搜尋結果全部」加入待印清單
+    function addAllSearchResultsToQueue() {
       if (globalSearchResults.length === 0) {
-        alert("⚠️ 沒有可列印的搜尋結果！");
+        alert("⚠️ 沒有搜尋結果可加入！");
         return;
       }
-      renderAndPrint(globalSearchResults);
+
+      var addedCount = 0;
+      globalSearchResults.forEach(item => {
+        var exists = printQueue.some(q => q.boxId === item.boxId);
+        if (!exists) {
+          printQueue.push(item);
+          addedCount++;
+        }
+      });
+
+      updateQueueUI();
+      alert(`✅ 已將本次搜尋的 ${addedCount} 個標籤通通加入待印清單！`);
     }
 
-    // ➕ 2. 把勾選的項目加入「待印清單」
+    // ➕ 2. 僅將「勾選的項目」加入待印清單
     function addSelectedToQueue() {
       var checkboxes = document.querySelectorAll('.search-cb:checked');
       if (checkboxes.length === 0) {
@@ -342,7 +372,7 @@
       });
 
       updateQueueUI();
-      alert(`✅ 已將 ${addedCount} 個標籤加入待印清單！`);
+      alert(`✅ 已將勾選的 ${addedCount} 個標籤加入待印清單！`);
     }
 
     function removeFromQueue(index) {
@@ -377,20 +407,16 @@
       qList.innerHTML = html;
     }
 
-    // ⚡ 3. 列印待印清單
+    // 🖨️ 3. 一鍵列印待列印清單的所有標籤
     function printQueueItems() {
       if (printQueue.length === 0) {
-        alert("⚠️ 待印清單目前是空的！請先搜尋並將標籤加入清單。");
+        alert("⚠️ 待列印清單目前是空的！請先搜尋並加入標籤。");
         return;
       }
-      renderAndPrint(printQueue);
-    }
 
-    // 🖨️ 通用標籤渲染與列印功能
-    function renderAndPrint(itemsList) {
       var printWin = window.open('', '_blank');
       if (!printWin) {
-        alert("⚠️ 瀏覽器阻擋了彈出視窗！請在網址列右側設定「允許本網站開啟彈出視窗」。");
+        alert("⚠️ 瀏覽器阻擋了彈出視窗！請允許本網站開啟彈出視窗。");
         return;
       }
 
@@ -416,12 +442,12 @@
         </head>
         <body>
           <div class="print-bar">
-            <button class="btn-p" onclick="window.print()">🖨️ 點我列印這 ${itemsList.length} 個標籤 (Ctrl + P)</button>
+            <button class="btn-p" onclick="window.print()">🖨️ 點我列印這 ${printQueue.length} 個標籤 (Ctrl + P)</button>
           </div>
           <div class="grid">
       `;
 
-      itemsList.forEach(item => {
+      printQueue.forEach(item => {
         var qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(item.boxId)}`;
         html += `
           <div class="card">
