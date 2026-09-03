@@ -479,7 +479,7 @@
       renderAndPrint(printQueue);
     }
 
-    // 🖨️ A4 標籤自訂尺寸微調與列印
+    // 🖨️ A4 標籤自訂尺寸與 A4 橫向滿版列印
     function renderAndPrint(itemsList) {
       var printWin = window.open('', '_blank');
       if (!printWin) {
@@ -491,12 +491,14 @@
         <!DOCTYPE html>
         <html>
         <head>
-          <title>📦 二手衣庫存條碼列印 (自訂尺寸版)</title>
-          <style>
+          <title>📦 二手衣庫存條碼列印</title>
+          <style id="dynamicPageStyle">
             @page {
               size: A4 portrait;
               margin: 8mm;
             }
+          </style>
+          <style>
             body { 
               font-family: Arial, "Microsoft JhengHei", sans-serif; 
               margin: 0; 
@@ -504,7 +506,7 @@
               background: #fff; 
             }
             
-            /* 🎛️ 尺寸控制面板 (列印時自動隱藏) */
+            /* 🎛️ 尺寸控制面板 */
             .control-panel { 
               background: #f8f9fa;
               border: 2px solid #3498db;
@@ -547,7 +549,7 @@
               margin-top: 5px;
             }
             
-            /* 網格與標籤卡片 */
+            /* 預設雙欄網格與標籤卡片 */
             .grid { 
               display: grid; 
               grid-template-columns: repeat(2, 1fr); 
@@ -567,6 +569,7 @@
               justify-content: center;
               align-items: center;
               page-break-inside: avoid; 
+              page-break-after: auto;
             }
             .card img {
               width: 85px;
@@ -584,7 +587,33 @@
               color: #333; 
               margin-top: 2px; 
             }
-            
+
+            /* 📐 當選擇 A4 橫向 (滿版) 時的專屬 CSS 覆寫 */
+            body.mode-landscape .grid {
+              grid-template-columns: 1fr !important;
+              gap: 0 !important;
+            }
+            body.mode-landscape .card {
+              height: 180mm !important;
+              page-break-after: always;
+              padding: 20px !important;
+              border: 2px dashed #333 !important;
+              border-radius: 12px !important;
+            }
+            body.mode-landscape .card img {
+              width: 320px !important;
+              height: 320px !important;
+              margin: 15px 0 !important;
+            }
+            body.mode-landscape .title {
+              font-size: 32px !important;
+              margin-bottom: 12px !important;
+            }
+            body.mode-landscape .info {
+              font-size: 22px !important;
+              margin-top: 10px !important;
+            }
+
             @media print {
               .control-panel { display: none !important; }
               body { padding: 0; }
@@ -607,10 +636,11 @@
               </div>
               <div class="control-item">
                 <label>3. 每頁直欄數：</label>
-                <select id="colsInput" onchange="updateLayout()" style="padding: 3px; font-size: 13px;">
+                <select id="colsInput" onchange="updateLayout()" style="padding: 4px 8px; font-size: 13px; font-weight: bold;">
                   <option value="2" selected>雙欄 (適合較大標籤)</option>
                   <option value="3">三欄 (適合中型貼紙)</option>
                   <option value="4">四欄 (適合小型貼紙)</option>
+                  <option value="landscape">🖥️ A4 橫向 (單張大標籤滿版)</option>
                 </select>
               </div>
             </div>
@@ -621,7 +651,7 @@
       `;
 
       itemsList.forEach(item => {
-        var qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(item.boxId)}`;
+        var qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(item.boxId)}`;
         html += `
           <div class="card">
             <div class="title">📦 ${item.boxId}</div>
@@ -637,23 +667,45 @@
 
           <script>
             function updateLayout() {
-              var qrSize = document.getElementById('qrSizeInput').value;
-              var cardHeight = document.getElementById('heightInput').value;
               var cols = document.getElementById('colsInput').value;
+              var dynamicStyle = document.getElementById('dynamicPageStyle');
+              var qrSlider = document.getElementById('qrSizeInput');
+              var heightSlider = document.getElementById('heightInput');
 
-              document.getElementById('qrVal').innerText = qrSize + 'px';
-              document.getElementById('hVal').innerText = cardHeight + 'mm';
+              if (cols === 'landscape') {
+                // 切換為 A4 橫向滿版
+                dynamicStyle.innerHTML = '@page { size: A4 landscape; margin: 8mm; }';
+                document.body.classList.add('mode-landscape');
+                
+                qrSlider.disabled = true;
+                heightSlider.disabled = true;
+                document.getElementById('qrVal').innerText = '自動大圖';
+                document.getElementById('hVal').innerText = '滿版 (180mm)';
+              } else {
+                // 切換回直向多欄
+                dynamicStyle.innerHTML = '@page { size: A4 portrait; margin: 8mm; }';
+                document.body.classList.remove('mode-landscape');
+                
+                qrSlider.disabled = false;
+                heightSlider.disabled = false;
 
-              document.getElementById('labelGrid').style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+                var qrSize = qrSlider.value;
+                var cardHeight = heightSlider.value;
 
-              var cards = document.querySelectorAll('.card');
-              cards.forEach(c => c.style.height = cardHeight + 'mm');
+                document.getElementById('qrVal').innerText = qrSize + 'px';
+                document.getElementById('hVal').innerText = cardHeight + 'mm';
 
-              var imgs = document.querySelectorAll('.qr-img');
-              imgs.forEach(img => {
-                img.style.width = qrSize + 'px';
-                img.style.height = qrSize + 'px';
-              });
+                document.getElementById('labelGrid').style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+
+                var cards = document.querySelectorAll('.card');
+                cards.forEach(c => c.style.height = cardHeight + 'mm');
+
+                var imgs = document.querySelectorAll('.qr-img');
+                imgs.forEach(img => {
+                  img.style.width = qrSize + 'px';
+                  img.style.height = qrSize + 'px';
+                });
+              }
             }
           <\/script>
         </body>
