@@ -14,9 +14,10 @@
     select, input[type="text"], input[type="number"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
     .btn { background-color: #27ae60; color: white; padding: 12px; border: none; width: 100%; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
     .btn-scan { background-color: #2980b9; margin-bottom: 12px; }
-    .btn-add-queue { background-color: #e67e22; margin-top: 8px; }
-    .btn-print { background-color: #d35400; margin-top: 10px; }
-    .btn-clear { background-color: #95a5a6; margin-top: 5px; font-size: 13px; padding: 6px; }
+    .btn-add-queue { background-color: #e67e22; margin-top: 8px; width: 100%; }
+    .btn-print-direct { background-color: #d35400; margin-top: 8px; width: 100%; }
+    .btn-print-queue { background-color: #27ae60; margin-top: 10px; width: 100%; }
+    .btn-clear { background-color: #95a5a6; font-size: 12px; padding: 4px 8px; border: none; color: white; border-radius: 4px; cursor: pointer; }
     #status { margin-top: 15px; font-size: 14px; font-weight: bold; text-align: center; }
     #boxInfo { margin-top: 6px; padding: 10px; background: #eef7fc; border-left: 4px solid #3498db; font-size: 13px; display: none; }
     #newBoxSection { background-color: #e8f8f5; padding: 12px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #2ecc71; }
@@ -30,7 +31,7 @@
     
     /* 🛒 標籤暫存區樣式 */
     .queue-section { margin-top: 25px; padding: 12px; background: #fef9e7; border: 2px solid #f39c12; border-radius: 8px; }
-    .queue-title { font-weight: bold; color: #d35400; font-size: 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .queue-title { font-weight: bold; color: #d35400; font-size: 15px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
     .queue-item { background: #fff; border: 1px solid #f39c12; padding: 6px 10px; margin-bottom: 6px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
   </style>
 </head>
@@ -104,7 +105,7 @@
 
   <!-- 👇 搜尋與標籤列印區 👇 -->
   <div class="search-section">
-    <div class="search-title">🔍 快速查詢與收集標籤</div>
+    <div class="search-title">🔍 快速查詢與列印標籤</div>
     <div class="form-group">
       <label>輸入想找的分類、座標或箱號</label>
       <input type="text" id="searchKeyword" placeholder="例如: 夏, 上衣, D3-3..." onkeypress="if(event.key==='Enter') searchData()">
@@ -113,16 +114,16 @@
 
     <div id="searchResults" style="margin-top: 15px;"></div>
 
-    <!-- 🛒 待列印標籤暫存區 -->
+    <!-- 🛒 跨次搜尋待列印標籤暫存區 -->
     <div class="queue-section">
       <div class="queue-title">
-        <span>🛒 待列印標籤暫存區 (<span id="queueCount">0</span>)</span>
+        <span>🛒 跨次搜尋待印清單 (<span id="queueCount">0</span>)</span>
         <button type="button" class="btn-clear" onclick="clearQueue()">清空暫存區</button>
       </div>
       <div id="queueList">
         <div style="color: #7f8c8d; font-size: 13px; text-align: center; padding: 10px;">尚未加入任何標籤</div>
       </div>
-      <button type="button" class="btn btn-print" onclick="openPrintPage()">🖨️ 一鍵列印暫存區的所有標籤</button>
+      <button type="button" class="btn btn-print-queue" onclick="printQueueItems()">🖨️ 一鍵列印「待印清單」所有標籤</button>
     </div>
   </div>
 
@@ -131,7 +132,7 @@
     
     var html5QrcodeScanner = null;
     var globalSearchResults = []; // 當前搜尋結果
-    var printQueue = [];           // 🛒 待列印購物車/暫存區
+    var printQueue = [];           // 🛒 跨次待列印暫存區
 
     function startScanner() {
       document.getElementById('reader-wrapper').style.display = 'block';
@@ -297,7 +298,11 @@
               `;
             });
 
-            html += `<button type="button" class="btn btn-add-queue" onclick="addSelectedToQueue()">➕ 將勾選項目加入待印清單</button>`;
+            // ⚡ 雙按鈕功能：一鍵全印 vs 勾選加入清單
+            html += `
+              <button type="button" class="btn btn-print-direct" onclick="printDirectlyAllSearchResults()">🖨️ 一鍵列印「本次搜尋」全部標籤 (${res.data.length} 個)</button>
+              <button type="button" class="btn btn-add-queue" onclick="addSelectedToQueue()">➕ 將勾選項目加入待印清單</button>
+            `;
             resDiv.innerHTML = html;
           } else {
             globalSearchResults = [];
@@ -309,7 +314,16 @@
         });
     }
 
-    // ➕ 把勾選的項目加入「標籤暫存區」
+    // ⚡ 1. 一鍵直接列印「本次搜尋」的所有標籤
+    function printDirectlyAllSearchResults() {
+      if (globalSearchResults.length === 0) {
+        alert("⚠️ 沒有可列印的搜尋結果！");
+        return;
+      }
+      renderAndPrint(globalSearchResults);
+    }
+
+    // ➕ 2. 把勾選的項目加入「待印清單」
     function addSelectedToQueue() {
       var checkboxes = document.querySelectorAll('.search-cb:checked');
       if (checkboxes.length === 0) {
@@ -320,7 +334,6 @@
       var addedCount = 0;
       checkboxes.forEach(cb => {
         var item = globalSearchResults[cb.value];
-        // 檢查是否重複加入
         var exists = printQueue.some(q => q.boxId === item.boxId);
         if (!exists) {
           printQueue.push(item);
@@ -332,19 +345,16 @@
       alert(`✅ 已將 ${addedCount} 個標籤加入待印清單！`);
     }
 
-    // ❌ 從暫存區移除單一項目
     function removeFromQueue(index) {
       printQueue.splice(index, 1);
       updateQueueUI();
     }
 
-    // 🗑️ 清空暫存區
     function clearQueue() {
       printQueue = [];
       updateQueueUI();
     }
 
-    // 🔄 更新暫存區 UI 畫面
     function updateQueueUI() {
       var qList = document.getElementById('queueList');
       var qCount = document.getElementById('queueCount');
@@ -367,13 +377,17 @@
       qList.innerHTML = html;
     }
 
-    // 🖨️ 列印暫存區的所有標籤
-    function openPrintPage() {
+    // ⚡ 3. 列印待印清單
+    function printQueueItems() {
       if (printQueue.length === 0) {
-        alert("⚠️ 待列印清單目前是空的！請先搜尋並將標籤加入清單。");
+        alert("⚠️ 待印清單目前是空的！請先搜尋並將標籤加入清單。");
         return;
       }
+      renderAndPrint(printQueue);
+    }
 
+    // 🖨️ 通用標籤渲染與列印功能
+    function renderAndPrint(itemsList) {
       var printWin = window.open('', '_blank');
       if (!printWin) {
         alert("⚠️ 瀏覽器阻擋了彈出視窗！請在網址列右側設定「允許本網站開啟彈出視窗」。");
@@ -402,12 +416,12 @@
         </head>
         <body>
           <div class="print-bar">
-            <button class="btn-p" onclick="window.print()">🖨️ 點我列印這 ${printQueue.length} 個標籤 (Ctrl + P)</button>
+            <button class="btn-p" onclick="window.print()">🖨️ 點我列印這 ${itemsList.length} 個標籤 (Ctrl + P)</button>
           </div>
           <div class="grid">
       `;
 
-      printQueue.forEach(item => {
+      itemsList.forEach(item => {
         var qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(item.boxId)}`;
         html += `
           <div class="card">
