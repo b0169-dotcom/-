@@ -11,7 +11,7 @@
     .form-group { margin-bottom: 12px; }
     label { font-weight: bold; font-size: 13px; display: block; margin-bottom: 4px; }
     .required { color: #e74c3c; margin-left: 2px; }
-    select, input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
+    select, input[type="text"], input[type="number"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
     .btn { background-color: #27ae60; color: white; padding: 12px; border: none; width: 100%; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
     .btn-scan { background-color: #2980b9; margin-bottom: 12px; }
     .btn-print { background-color: #d35400; margin-top: 15px; }
@@ -54,7 +54,6 @@
       <div id="boxInfo"></div>
     </div>
 
-    <!-- 👇 新箱建檔專用區塊 👇 -->
     <div id="newBoxSection">
       <div style="font-weight: bold; color: #27ae60; margin-bottom: 8px;">✨ 新箱號基本資料 (自動拆解/可手動修正)</div>
       <div class="form-group">
@@ -98,13 +97,13 @@
 
   <!-- 👇 搜尋與標籤列印區 👇 -->
   <div class="search-section">
-    <div class="search-title">🔍 快速查詢與標籤列印</div>
+    <div class="search-title">🔍 快速查詢與勾選列印</div>
     <div class="form-group">
       <label>輸入想找的分類、座標或箱號</label>
       <input type="text" id="searchKeyword" placeholder="例如: 夏, 上衣, D3-3..." onkeypress="if(event.key==='Enter') searchData()">
     </div>
     <button type="button" class="btn btn-search" onclick="searchData()">搜尋庫存</button>
-    <button type="button" class="btn btn-print" onclick="openPrintPage()">🖨️ 一鍵生成標籤列印頁面</button>
+    <button type="button" class="btn btn-print" onclick="openPrintPage()">🖨️ 列印已勾選的標籤</button>
     
     <div id="searchResults" style="margin-top: 15px;"></div>
   </div>
@@ -113,6 +112,7 @@
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxVmccNkeLxB_7GSjGVSVZr1N5zrQCwtw7K2MDlg-20bJlzenZnSp9uPpHeu7qnVhqXHg/exec";
     
     var html5QrcodeScanner = null;
+    var globalSearchResults = []; // 暫存搜尋結果，供列印使用
 
     function startScanner() {
       document.getElementById('reader-wrapper').style.display = 'block';
@@ -135,7 +135,6 @@
       }
     }
 
-    // 💡 自動解析箱號格式 (2026-夏-上衣-100-01)
     function autoParseBoxId() {
       var boxId = document.getElementById('boxId').value.trim();
       var parts = boxId.split('-');
@@ -193,7 +192,6 @@
       var operator = document.getElementById('operator').value.trim();
       var note = document.getElementById('note').value.trim();
       var newLocation = document.getElementById('newLocation').value.trim();
-
       var season = document.getElementById('season').value.trim();
       var category = document.getElementById('category').value.trim();
       var price = document.getElementById('price').value.trim();
@@ -203,12 +201,7 @@
 
       if (rawType === "新箱建檔") {
         if (!season || !category || !price || !newLocation) {
-          alert("⚠️【新箱建檔】資料必須完全填寫！\n\n缺少欄位：\n" +
-            (!season ? "• 季節\n" : "") +
-            (!category ? "• 分類/種類\n" : "") +
-            (!price ? "• 單價\n" : "") +
-            (!newLocation ? "• 存放座標位置\n" : "")
-          );
+          alert("⚠️【新箱建檔】資料必須完全填寫！");
           return;
         }
       }
@@ -241,11 +234,18 @@
         })
         .catch(err => {
           statusDiv.style.color = "#e74c3c";
-          statusDiv.innerText = "❌ 傳送失敗！請確認 GAS 部署權限已開至「任何人」。";
+          statusDiv.innerText = "❌ 傳送失敗！";
           btn.disabled = false;
         });
     }
 
+    // 全選/全不選功能
+    function selectAllCheckboxes(isCheck) {
+      var checkboxes = document.querySelectorAll('.print-cb');
+      checkboxes.forEach(cb => cb.checked = isCheck);
+    }
+
+    // 🔍 搜尋功能 (加入勾選框)
     function searchData() {
       var kw = document.getElementById('searchKeyword').value.trim();
       var resDiv = document.getElementById('searchResults');
@@ -257,99 +257,104 @@
         .then(res => res.json())
         .then(res => {
           if (res.success && res.data.length > 0) {
-            var html = `<div style="margin-bottom:8px; font-size:13px; color:#555;">✅ 找到 ${res.data.length} 箱資料：</div>`;
-            res.data.forEach(item => {
-              html += `<div class="result-card">
-                <div style="font-weight:bold; margin-bottom:4px; font-size:15px; border-bottom:1px dashed #ccc; padding-bottom:4px;">📦 ${item.boxId}</div>
-                📍 <b>座標：</b>${item.location} | 💰 <b>單價：</b>$${item.price}<br>
-                🏷️ <b>分類：</b>${item.season}${item.category} | 📦 <b>庫存：</b>${item.qty} 箱
-              </div>`;
+            globalSearchResults = res.data; // 暫存資料
+            
+            var html = `
+              <div style="margin-bottom:12px; font-size:14px; color:#555; display:flex; justify-content:space-between; align-items:center;">
+                <div>✅ 找到 ${res.data.length} 箱資料</div>
+                <div>
+                  <button type="button" onclick="selectAllCheckboxes(true)" style="padding:4px 8px; cursor:pointer; background:#ecf0f1; border:1px solid #bdc3c7; border-radius:4px;">全選</button>
+                  <button type="button" onclick="selectAllCheckboxes(false)" style="padding:4px 8px; cursor:pointer; background:#ecf0f1; border:1px solid #bdc3c7; border-radius:4px; margin-left:5px;">全不選</button>
+                </div>
+              </div>
+            `;
+            
+            res.data.forEach((item, index) => {
+              html += `
+                <div class="result-card" style="display: flex; align-items: center; gap: 15px;">
+                  <input type="checkbox" class="print-cb" value="${index}" style="width: 22px; height: 22px; cursor: pointer;" checked>
+                  <div style="flex-grow: 1;">
+                    <div style="font-weight:bold; margin-bottom:4px; font-size:15px; border-bottom:1px dashed #ccc; padding-bottom:4px;">📦 ${item.boxId}</div>
+                    📍 <b>座標：</b>${item.location} | 💰 <b>單價：</b>$${item.price}<br>
+                    🏷️ <b>分類：</b>${item.season}${item.category} | 📦 <b>庫存：</b>${item.qty} 箱
+                  </div>
+                </div>
+              `;
             });
             resDiv.innerHTML = html;
           } else {
+            globalSearchResults = [];
             resDiv.innerHTML = `<div style="color:#e74c3c; font-weight:bold;">⚠️ 找不到與「${kw}」相關的箱號。</div>`;
           }
         })
         .catch(err => {
-          resDiv.innerHTML = "❌ 搜尋失敗，請確認網路連線或 GAS 存取權限。";
+          resDiv.innerHTML = "❌ 搜尋失敗，請確認網路連線。";
         });
     }
 
-    // 🖨️ 一鍵生成標籤列印頁面 (已修正防彈出阻擋機制)
+    // 🖨️ 瞬間列印 (只抓取有勾選的項目)
     function openPrintPage() {
-      var kw = document.getElementById('searchKeyword').value.trim();
+      // 抓出畫面上所有被打勾的 checkbox
+      var checkboxes = document.querySelectorAll('.print-cb:checked');
       
-      // 1. 按下按鈕立刻開啟新視窗，避免被瀏覽器當成廣告阻擋
+      if (checkboxes.length === 0) {
+        alert("⚠️ 請先在下方搜尋資料，並至少勾選一個要列印的標籤！");
+        return;
+      }
+
       var printWin = window.open('', '_blank');
-      
-      // 檢查是否還是被阻擋了
       if (!printWin) {
         alert("⚠️ 瀏覽器阻擋了彈出視窗！請在網址列右側設定「允許本網站開啟彈出視窗」。");
         return;
       }
 
-      // 先顯示讀取中畫面
-      printWin.document.write("<h3 style='font-family:sans-serif; color:#3498db; padding: 20px;'>⏳ 正在連線讀取庫存資料並產生標籤，請稍候...</h3>");
+      var html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>📦 二手衣庫存條碼列印</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 15px; background: #fff; }
+            .print-bar { margin-bottom: 20px; text-align: center; }
+            .btn-p { background: #27ae60; color: white; border: none; padding: 10px 20px; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; }
+            .grid { display: flex; flex-wrap: wrap; gap: 12px; }
+            .card { width: 45%; border: 2px dashed #333; padding: 10px; box-sizing: border-box; text-align: center; border-radius: 8px; page-break-inside: avoid; }
+            .title { font-weight: bold; font-size: 14px; margin-bottom: 4px; word-break: break-all; }
+            .info { font-size: 12px; color: #444; margin-top: 4px; }
+            @media print {
+              .print-bar { display: none; }
+              body { padding: 0; }
+              .card { width: 48%; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-bar">
+            <button class="btn-p" onclick="window.print()">🖨️ 點我立即列印標籤 (Ctrl + P)</button>
+          </div>
+          <div class="grid">
+      `;
 
-      // 2. 向 Google 請求資料
-      fetch(`${GAS_API_URL}?action=search&keyword=${encodeURIComponent(kw)}`)
-        .then(res => res.json())
-        .then(res => {
-          if (!res.success || res.data.length === 0) {
-            printWin.document.body.innerHTML = "<h3 style='font-family:sans-serif; color:#e74c3c; padding: 20px;'>⚠️ 找不到可列印的標籤資料！請確認搜尋條件是否有對應的庫存。</h3>";
-            return;
-          }
+      // 將有勾選的項目轉換為標籤畫面
+      checkboxes.forEach(cb => {
+        var index = cb.value;
+        var item = globalSearchResults[index]; // 從暫存區拿出資料
+        var qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(item.boxId)}`;
+        html += `
+          <div class="card">
+            <div class="title">📦 ${item.boxId}</div>
+            <img src="${qrUrl}" width="120" height="120" />
+            <div class="info"><b>📍 位置：</b>${item.location} | <b>單價：</b>$${item.price}</div>
+            <div class="info"><b>🏷️ 分類：</b>${item.season} / ${item.category}</div>
+          </div>
+        `;
+      });
 
-          var html = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <title>📦 二手衣庫存條碼列印</title>
-              <style>
-                body { font-family: Arial, sans-serif; padding: 15px; background: #fff; }
-                .print-bar { margin-bottom: 20px; text-align: center; }
-                .btn-p { background: #27ae60; color: white; border: none; padding: 10px 20px; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; }
-                .grid { display: flex; flex-wrap: wrap; gap: 12px; }
-                .card { width: 45%; border: 2px dashed #333; padding: 10px; box-sizing: border-box; text-align: center; border-radius: 8px; page-break-inside: avoid; }
-                .title { font-weight: bold; font-size: 14px; margin-bottom: 4px; word-break: break-all; }
-                .info { font-size: 12px; color: #444; margin-top: 4px; }
-                @media print {
-                  .print-bar { display: none; }
-                  body { padding: 0; }
-                  .card { width: 48%; }
-                }
-              </style>
-            </head>
-            <body>
-              <div class="print-bar">
-                <button class="btn-p" onclick="window.print()">🖨️ 點我立即列印標籤 (Ctrl + P)</button>
-              </div>
-              <div class="grid">
-          `;
-
-          res.data.forEach(item => {
-            // 生成 QR Code 圖片
-            var qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(item.boxId)}`;
-            html += `
-              <div class="card">
-                <div class="title">📦 ${item.boxId}</div>
-                <img src="${qrUrl}" width="120" height="120" />
-                <div class="info"><b>📍 位置：</b>${item.location} | <b>單價：</b>$${item.price}</div>
-                <div class="info"><b>🏷️ 分類：</b>${item.season} / ${item.category}</div>
-              </div>
-            `;
-          });
-
-          html += `</div></body></html>`;
-          
-          // 將取得的資料覆寫上列印頁面
-          printWin.document.open();
-          printWin.document.write(html);
-          printWin.document.close();
-        })
-        .catch(err => {
-          printWin.document.body.innerHTML = "<h3 style='font-family:sans-serif; color:#e74c3c; padding: 20px;'>❌ 產生標籤失敗，請確認網路連線或系統權限。</h3>";
-        });
+      html += `</div></body></html>`;
+      
+      printWin.document.open();
+      printWin.document.write(html);
+      printWin.document.close();
     }
   </script>
 </body>
